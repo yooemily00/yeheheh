@@ -39,3 +39,24 @@ jobs:
     steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+
+  verify:
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check that the Pages URL serves the app
+        env:
+          URL: https://yooemily00.github.io/yeheheh/
+        run: |
+          for i in $(seq 1 12); do
+            code=$(curl -s -o page.html -w '%{http_code}' "$URL")
+            if [ "$code" = 200 ] && grep -q '<div id="root">' page.html; then break; fi
+            echo "attempt $i: HTTP $code"; sleep 10
+          done
+          [ "$code" = 200 ] || { echo "Pages URL returned HTTP $code"; exit 1; }
+          grep -q '<title>검사 단위 변환</title>' page.html || { echo "unexpected page content"; cat page.html; exit 1; }
+          for asset in $(grep -oE '/yeheheh/assets/[^"]+' page.html); do
+            c=$(curl -s -o /dev/null -w '%{http_code}' "https://yooemily00.github.io$asset")
+            echo "$asset -> $c"; [ "$c" = 200 ] || exit 1
+          done
+          echo "OK: $URL serves the built app"
